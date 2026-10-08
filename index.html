@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="description" content="Starting the Multi-Agent Research System. You will be redirected automatically when it is ready.">
+<title>Waking up · Multi-Agent Research System</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%AC%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151d;
+    --panel-2: #171b25;
+    --line: #232937;
+    --text: #eef0f6;
+    --muted: #8f97aa;
+    --dim: #5b6377;
+    --accent: #8b9bff;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --err: #f87171;
+    --ring: var(--accent);
+    --shadow: 0 30px 80px rgba(0, 0, 0, .45);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5fa;
+      --panel: #ffffff;
+      --panel-2: #f6f7fb;
+      --line: #e3e6ef;
+      --text: #151823;
+      --muted: #626a7e;
+      --dim: #99a0b2;
+      --accent: #5865f2;
+      --ok: #16a34a;
+      --warn: #d97706;
+      --err: #dc2626;
+      --shadow: 0 30px 80px rgba(40, 50, 90, .12);
+    }
+  }
+  body[data-state="ready"] { --ring: var(--ok); }
+  body[data-state="slow"]  { --ring: var(--warn); }
+  body[data-state="error"],
+  body[data-state="offline"],
+  body[data-state="config"] { --ring: var(--err); }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: max(1.5rem, env(safe-area-inset-top)) 1.1rem max(1.5rem, env(safe-area-inset-bottom));
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Background: faint grid + glow */
+  .bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .bg::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    opacity: .35;
+    mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 20%, transparent 70%);
+  }
+  .bg::after {
+    content: ""; position: absolute; left: 50%; top: -10%;
+    width: 760px; height: 520px; transform: translateX(-50%);
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--ring) 22%, transparent), transparent);
+    transition: background .6s ease;
+  }
+
+  .card {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 500px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 1.6rem 1.6rem 1.4rem;
+  }
+
+  /* Brand */
+  .brand { display: flex; align-items: center; gap: .75rem; padding-bottom: 1.2rem; border-bottom: 1px solid var(--line); }
+  .logo { width: 38px; height: 38px; flex: none; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); display: grid; place-items: center; }
+  .brand .name { font-weight: 650; font-size: .98rem; letter-spacing: -.01em; }
+  .brand .tag { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 1.8rem 0 1.2rem; }
+  .ring-wrap { position: relative; width: 168px; height: 168px; margin: 0 auto 1.4rem; }
+  .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+  .ring-track { fill: none; stroke: var(--line); stroke-width: 6; }
+  .ring-bar {
+    fill: none; stroke: var(--ring); stroke-width: 6; stroke-linecap: round;
+    stroke-dasharray: 326.7; stroke-dashoffset: 326.7;
+    transition: stroke-dashoffset .6s ease, stroke .4s ease;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ring) 55%, transparent));
+  }
+  .ring-spin {
+    fill: none; stroke: var(--ring); stroke-width: 6; stroke-linecap: round;
+    stroke-dasharray: 22 304.7; opacity: .55;
+    transform-origin: 60px 60px;
+    animation: spin 1.6s linear infinite;
+  }
+  body[data-state="ready"] .ring-spin,
+  body[data-state="error"] .ring-spin,
+  body[data-state="offline"] .ring-spin,
+  body[data-state="config"] .ring-spin { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .ring-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .timer { font-size: 2rem; font-weight: 650; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .timer-label { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; margin-top: 2px; }
+  .ring-icon { display: none; color: var(--ring); }
+  body[data-state="ready"] .timer-box,
+  body[data-state="error"] .timer-box,
+  body[data-state="offline"] .timer-box,
+  body[data-state="config"] .timer-box { display: none; }
+  body[data-state="ready"] .ring-icon,
+  body[data-state="error"] .ring-icon,
+  body[data-state="offline"] .ring-icon,
+  body[data-state="config"] .ring-icon { display: block; }
+  .ring-icon svg { width: 56px; height: 56px; transform: none; }
+
+  h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.025em; }
+  .desc { margin: .55rem auto 0; max-width: 380px; font-size: .92rem; color: var(--muted); line-height: 1.6; }
+
+  /* Steps */
+  .steps { list-style: none; margin: .4rem 0 0; padding: .9rem; background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; display: grid; gap: .15rem; }
+  .step { display: flex; align-items: center; gap: .75rem; padding: .5rem .4rem; font-size: .88rem; color: var(--dim); transition: color .3s; }
+  .dot { width: 20px; height: 20px; flex: none; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; transition: all .3s; }
+  .dot svg { width: 11px; height: 11px; opacity: 0; transition: opacity .2s; }
+  .step.active { color: var(--text); font-weight: 550; }
+  .step.active .dot { border-color: var(--ring); position: relative; }
+  .step.active .dot::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ring); animation: pulse 1.3s ease-in-out infinite; }
+  .step.done { color: var(--muted); }
+  .step.done .dot { background: var(--ok); border-color: var(--ok); color: #06210f; }
+  .step.done .dot svg { opacity: 1; }
+  @keyframes pulse { 0%, 100% { transform: scale(.7); opacity: .6; } 50% { transform: scale(1.1); opacity: 1; } }
+  body[data-state="error"] .step.active .dot::after,
+  body[data-state="offline"] .step.active .dot::after { animation: none; }
+
+  /* Meta */
+  .meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: 1rem; }
+  .meta div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: .6rem .5rem; text-align: center; }
+  .meta b { display: block; font-size: .95rem; font-variant-numeric: tabular-nums; }
+  .meta span { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+
+  /* Actions */
+  .actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1.2rem; }
+  .btn {
+    flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+    padding: .85rem 1.2rem; border-radius: 12px; font: inherit; font-weight: 600; font-size: .92rem;
+    text-decoration: none; cursor: pointer; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); transition: transform .12s ease, border-color .2s, background .2s;
+  }
+  .btn:hover { transform: translateY(-1px); border-color: var(--dim); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .btn[hidden] { display: none; }
+
+  .note { margin-top: .9rem; text-align: center; font-size: .84rem; color: var(--muted); min-height: 1.2em; }
+  .note button { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; padding: 0 0 0 .3rem; }
+
+  .foot { position: relative; z-index: 1; margin-top: 1.4rem; font-size: .75rem; color: var(--dim); text-align: center; line-height: 1.6; }
+
+  @media (max-width: 420px) {
+    .card { padding: 1.3rem 1.1rem 1.1rem; border-radius: 18px; }
+    .ring-wrap { width: 148px; height: 148px; }
+    .timer { font-size: 1.7rem; }
+    h1 { font-size: 1.2rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ring-spin, .step.active .dot::after { animation-duration: 4s; }
+    .ring-bar, .btn { transition: none; }
+  }
+</style>
+</head>
+
+<body data-state="waking">
+  <div class="bg" aria-hidden="true"></div>
+
+  <main class="card">
+    <header class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent)">
+          <circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><circle cx="12" cy="12" r="2.4"/>
+          <path d="M6.6 7.4l3.7 3M17.4 7.4l-3.7 3M6.6 16.6l3.7-3M17.4 16.6l-3.7-3"/>
+        </svg>
+      </div>
+      <div>
+        <div class="name">Multi-Agent Research System</div>
+        <div class="tag">Search · Read · Write · Critique</div>
+      </div>
+    </header>
+
+    <section class="hero" role="status" aria-live="polite">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"/>
+          <circle class="ring-bar" id="ringBar" cx="60" cy="60" r="52"/>
+          <circle class="ring-spin" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="ring-center">
+          <div class="timer-box">
+            <div class="timer" id="timer">0:00</div>
+            <div class="timer-label">elapsed</div>
+          </div>
+          <div class="ring-icon" id="ringIcon"></div>
+        </div>
+      </div>
+      <h1 id="title">Waking up the research system</h1>
+      <p class="desc" id="desc">Render's free tier sleeps when idle. Starting it usually takes 30–60 seconds.</p>
+    </section>
+
+    <ol class="steps" id="steps" aria-label="Startup progress">
+      <li class="step"><span class="dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.2 2.2 4.8-5"/></svg></span>Contacting Render</li>
+      <li class="step"><span class="dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.2 2.2 4.8-5"/></svg></span>Starting the server</li>
+      <li class="step"><span class="dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.2 2.2 4.8-5"/></svg></span>Loading the Streamlit app</li>
+      <li class="step"><span class="dot"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.2 2.2 4.8-5"/></svg></span>Ready to research</li>
+    </ol>
+
+    <div class="meta">
+      <div><b id="mAttempts">0</b><span>Checks</span></div>
+      <div><b id="mLast">—</b><span>Last check</span></div>
+      <div><b id="mElapsed">0:00</b><span>Total time</span></div>
+    </div>
+
+    <div class="actions">
+      <a class="btn primary" id="openBtn" href="#">Open app now <span aria-hidden="true">↗</span></a>
+      <button class="btn" id="retryBtn" type="button" hidden>Try again</button>
+    </div>
+
+    <p class="note" id="note"></p>
+
+    <noscript>
+      <p class="note">JavaScript is required for automatic wake-up. Please open the app link directly.</p>
+    </noscript>
+  </main>
+
+  <p class="foot">Hosted on Render free tier · this page wakes it up and redirects you automatically.</p>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ===================== CONFIG ===================== */
+  const RENDER_URL = "YOUR_RENDER_URL";   // e.g. "https://my-research-app.onrender.com"
+
+  const PROBE_PATH        = "/favicon.png"; // static asset used when the browser blocks reading /_stcore/health (CORS)
+  const REQUEST_TIMEOUT   = 10000;          // per-request timeout (ms)
+  const SLOW_AFTER_MS     = 75000;          // show the "taking longer" message
+  const MAX_WAIT_MS       = 240000;         // stop auto-polling and show an error
+  const REDIRECT_DELAY_S  = 3;              // seconds before auto-redirect
+  /* ================================================== */
+
+  const BASE = String(RENDER_URL).trim().replace(/\/+$/, "");
+  const CONFIGURED = /^https?:\/\/[^\s]+$/i.test(BASE);
+  const HEALTH_URL = BASE + "/_stcore/health";
+
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    title: $("title"), desc: $("desc"), timer: $("timer"), ringBar: $("ringBar"), ringIcon: $("ringIcon"),
+    steps: Array.from(document.querySelectorAll("#steps .step")),
+    mAttempts: $("mAttempts"), mLast: $("mLast"), mElapsed: $("mElapsed"),
+    openBtn: $("openBtn"), retryBtn: $("retryBtn"), note: $("note")
+  };
+
+  const ICONS = {
+    ok:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+    err: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16.5v.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>',
+    off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0114-3.6M5 12.6a10 10 0 015-2.7M8.5 16.4a5 5 0 013-1.4M12 20h.01M2 2l20 20"/></svg>'
+  };
+
+  const COPY = {
+    waking:  ["Waking up the research system", "Render's free tier sleeps when idle. Starting it usually takes 30–60 seconds."],
+    booting: ["Booting the agents", "The server is starting. Hang tight, you'll be redirected automatically."],
+    slow:    ["Taking longer than usual", "Cold starts can occasionally take a couple of minutes. We'll keep checking."],
+    ready:   ["Research system is ready", "Everything is up and running."],
+    error:   ["Couldn't reach the app", "The service didn't respond in time. It may be redeploying or temporarily down."],
+    offline: ["You appear to be offline", "Reconnect to the internet and we'll resume automatically."],
+    config:  ["Setup needed", "Open index.html and set RENDER_URL to your Render app URL (for example https://my-app.onrender.com)."]
+  };
+
+  let state = "waking";
+  let startedAt = Date.now();
+  let attempts = 0;
+  let lastCheckAt = null;
+  let consecutive = 0;
+  let reachable = false;
+  let checking = false;
+  let done = false;
+  let pollTimer = null;
+  let redirectTimer = null;
+  let tickTimer = null;
+
+  /* ---------- helpers ---------- */
+  const fmt = (ms) => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  };
+
+  function timedFetch(url, opts) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT);
+    return fetch(url, Object.assign({ signal: ctrl.signal, cache: "no-store", redirect: "follow" }, opts))
+      .finally(() => clearTimeout(t));
+  }
+
+  // Cross-origin-safe status probe: an <img> only loads on a real 200 + valid image.
+  function probeImage(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const t = setTimeout(() => { img.src = ""; resolve(false); }, REQUEST_TIMEOUT);
+      img.onload = () => { clearTimeout(t); resolve(true); };
+      img.onerror = () => { clearTimeout(t); resolve(false); };
+      img.src = url;
+    });
+  }
+
+  /* ---------- health check ---------- */
+  async function checkHealth() {
+    const stamp = "t=" + Date.now();
+
+    // 1) Normal request: if CORS allows it, we can read the real answer.
+    try {
+      const res = await timedFetch(HEALTH_URL + "?" + stamp);
+      const body = (await res.text()).trim().toLowerCase();
+      return { ready: res.ok && body === "ok", reachable: true, mode: "cors" };
+    } catch (err) {
+      if (err && err.name === "AbortError") return { ready: false, reachable: false, mode: "timeout" };
+    }
+
+    // 2) CORS blocked (or server down). Check reachability with an opaque request...
+    try {
+      await timedFetch(HEALTH_URL + "?" + stamp, { mode: "no-cors" });
+    } catch (err) {
+      return { ready: false, reachable: false, mode: "network" };
+    }
+
+    // 3) ...then confirm the app actually serves content (not a 5xx / wake-up page).
+    const assetOk = await probeImage(BASE + PROBE_PATH + "?" + stamp);
+    return { ready: assetOk, reachable: true, mode: "opaque" };
+  }
+
+  /* ---------- state + rendering ---------- */
+  function activeStage(elapsed) {
+    if (state === "ready") return 4;
+    if (!reachable) return elapsed < 8000 ? 0 : 1;
+    return 2;
+  }
+
+  function setState(next) {
+    state = next;
+    document.body.dataset.state = next;
+    render();
+  }
+
+  function render() {
+    const elapsed = Date.now() - startedAt;
+    let copyKey = state;
+    if (state === "waking" && reachable) copyKey = "booting";
+    const [t, d] = COPY[copyKey];
+    el.title.textContent = t;
+    el.desc.textContent = d;
+    document.title = (state === "ready" ? "Ready" : state === "error" ? "Unavailable" : state === "config" ? "Setup needed" : "Waking up") + " · Multi-Agent Research System";
+
+    // stages
+    const active = activeStage(elapsed);
+    el.steps.forEach((li, i) => {
+      li.classList.toggle("done", i < active);
+      li.classList.toggle("active", i === active);
+    });
+
+    // ring icon
+    if (state === "ready") el.ringIcon.innerHTML = ICONS.ok;
+    else if (state === "error" || state === "config") el.ringIcon.innerHTML = ICONS.err;
+    else if (state === "offline") el.ringIcon.innerHTML = ICONS.off;
+
+    // buttons
+    el.retryBtn.hidden = !(state === "error" || state === "slow" || state === "offline");
+    tick();
+  }
+
+  function tick() {
+    const elapsed = (done ? doneAt : Date.now()) - startedAt;
+    el.timer.textContent = fmt(elapsed);
+    el.mElapsed.textContent = fmt(elapsed);
+    el.mAttempts.textContent = String(attempts);
+    el.mLast.textContent = lastCheckAt ? (Math.max(0, Math.round((Date.now() - lastCheckAt) / 1000)) + "s ago") : "—";
+
+    let pct;
+    if (state === "ready") pct = 100;
+    else if (state === "error" || state === "offline" || state === "config") pct = Math.min(94, 94 * (1 - Math.exp(-elapsed / 45000)));
+    else pct = Math.min(94, 94 * (1 - Math.exp(-elapsed / 45000)));
+    el.ringBar.style.strokeDashoffset = String(326.7 * (1 - pct / 100));
+  }
+
+  /* ---------- polling ---------- */
+  const nextDelay = (elapsed) => (elapsed < 30000 ? 3000 : elapsed < 90000 ? 5000 : 8000);
+
+  function schedule(ms) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(poll, ms);
+  }
+
+  async function poll() {
+    if (done || checking) return;
+
+    if (!navigator.onLine) { setState("offline"); return; }
+
+    checking = true;
+    attempts++;
+    let result;
+    try { result = await checkHealth(); }
+    catch (e) { result = { ready: false, reachable: false, mode: "network" }; }
+    checking = false;
+    lastCheckAt = Date.now();
+
+    if (result.reachable) reachable = true;
+    consecutive = result.ready ? consecutive + 1 : 0;
+    const needed = result.mode === "cors" ? 1 : 2;   // fallback mode needs two confirmations in a row
+
+    if (result.ready && consecutive >= needed) { onReady(); return; }
+
+    const elapsed = Date.now() - startedAt;
+    if (elapsed > MAX_WAIT_MS) { setState("error"); return; }
+
+    setState(elapsed > SLOW_AFTER_MS ? "slow" : "waking");
+    schedule(result.ready ? 1500 : nextDelay(elapsed));
+  }
+
+  /* ---------- ready + redirect ---------- */
+  let doneAt = 0;
+  function onReady() {
+    done = true;
+    doneAt = Date.now();
+    clearTimeout(pollTimer);
+    setState("ready");
+
+    let n = REDIRECT_DELAY_S;
+    const show = () => {
+      el.note.innerHTML = "Redirecting in " + n + "s…<button type=\"button\" id=\"cancelBtn\">Stay here</button>";
+      const c = $("cancelBtn");
+      if (c) c.onclick = () => {
+        clearInterval(redirectTimer);
+        el.note.textContent = "Redirect cancelled. Use the button above whenever you're ready.";
+      };
+    };
+    show();
+    redirectTimer = setInterval(() => {
+      n--;
+      if (n <= 0) { clearInterval(redirectTimer); el.note.textContent = "Opening the app…"; window.location.replace(BASE); }
+      else show();
+    }, 1000);
+  }
+
+  /* ---------- restart / events ---------- */
+  function restart() {
+    clearTimeout(pollTimer);
+    clearInterval(redirectTimer);
+    startedAt = Date.now();
+    attempts = 0; lastCheckAt = null; consecutive = 0; reachable = false; done = false; checking = false;
+    el.note.textContent = "";
+    setState("waking");
+    poll();
+  }
+
+  el.retryBtn.addEventListener("click", restart);
+
+  window.addEventListener("online", () => {
+    if (!done && state === "offline") { setState("waking"); poll(); }
+  });
+  window.addEventListener("offline", () => { if (!done) { clearTimeout(pollTimer); setState("offline"); } });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !done && !checking && state !== "error" && state !== "config") {
+      clearTimeout(pollTimer);
+      poll();
+    }
+  });
+
+  /* ---------- boot ---------- */
+  if (!CONFIGURED) {
+    el.openBtn.removeAttribute("href");
+    el.openBtn.setAttribute("aria-disabled", "true");
+    el.openBtn.style.opacity = ".5";
+    el.openBtn.style.pointerEvents = "none";
+    setState("config");
+    return;
+  }
+
+  el.openBtn.href = BASE;
+  tickTimer = setInterval(() => { if (!done) tick(); }, 500);
+  setState("waking");
+  poll();   // first request doubles as the wake-up call
+})();
+</script>
+</body>
+</html>
